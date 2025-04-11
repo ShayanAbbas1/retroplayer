@@ -1,24 +1,32 @@
 "use client";
 
-import VirtualList from "./VirtualList";
-import ArtistItem from "./ArtistItem";
 import { SpotifyArtist } from "@/types/spotify";
+import { usePopup } from "@/contexts/PopupContext";
 
-interface ArtistsListProps {
-  artists: SpotifyArtist[];
-}
+export default function ArtistsList({ artists }: { artists: SpotifyArtist[] }) {
+  const { showPopup } = usePopup();
 
-export default function ArtistsList({ artists }: ArtistsListProps) {
   return (
-    <div className="bg-gray-800 p-6 rounded-lg">
-      <h2 className="text-2xl font-bold text-white mb-4">Top Artists</h2>
-      <VirtualList<SpotifyArtist>
-        items={artists}
-        itemHeight={80}
-        className="h-[600px]"
-      >
-        {(artist, index) => <ArtistItem artist={artist} index={index} />}
-      </VirtualList>
+    <div className="space-y-4">
+      {artists.map((artist) => (
+        <div
+          key={artist.id}
+          onClick={() => showPopup(artist)}
+          className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors"
+        >
+          <img
+            src={artist.images[0]?.url}
+            alt={artist.name}
+            className="w-12 h-12 rounded-full object-cover"
+          />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-medium truncate">{artist.name}</h3>
+            <p className="text-gray-400 text-sm truncate">
+              {artist.genres.slice(0, 2).join(", ")}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

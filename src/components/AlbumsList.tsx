@@ -1,24 +1,32 @@
 "use client";
 
-import VirtualList from "./VirtualList";
-import AlbumItem from "./AlbumItem";
 import { SpotifyAlbum } from "@/types/spotify";
+import { usePopup } from "@/contexts/PopupContext";
 
-interface AlbumsListProps {
-  albums: SpotifyAlbum[];
-}
+export default function AlbumsList({ albums }: { albums: SpotifyAlbum[] }) {
+  const { showPopup } = usePopup();
 
-export default function AlbumsList({ albums }: AlbumsListProps) {
   return (
-    <div className="bg-gray-800 p-6 rounded-lg">
-      <h2 className="text-2xl font-bold text-white mb-4">Top Albums</h2>
-      <VirtualList<SpotifyAlbum>
-        items={albums}
-        itemHeight={80}
-        className="h-[600px]"
-      >
-        {(album, index) => <AlbumItem album={album} index={index} />}
-      </VirtualList>
+    <div className="space-y-4">
+      {albums.map((album) => (
+        <div
+          key={album.id}
+          onClick={() => showPopup(album)}
+          className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors"
+        >
+          <img
+            src={album.images[0]?.url}
+            alt={album.name}
+            className="w-12 h-12 rounded object-cover"
+          />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-medium truncate">{album.name}</h3>
+            <p className="text-gray-400 text-sm truncate">
+              {album.artists[0].name}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
