@@ -10,7 +10,7 @@ export const authOptions: AuthOptions = {
         url: "https://accounts.spotify.com/authorize",
         params: {
           scope:
-            "user-read-email user-read-private user-top-read user-read-recently-played",
+            "user-read-email user-read-private user-top-read user-read-recently-played user-read-playback-state",
           prompt: "select_account",
           show_dialog: true,
         },

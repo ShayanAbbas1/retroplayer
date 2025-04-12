@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { SpotifyArtist, SpotifyTrack, SpotifyAlbum } from "@/types/spotify";
 
 interface MusicTasteAnalyzerProps {
@@ -14,6 +15,7 @@ export default function MusicTasteAnalyzer({
   tracks,
   albums,
 }: MusicTasteAnalyzerProps) {
+  const { data: session } = useSession();
   const [analysis, setAnalysis] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,34 +26,79 @@ export default function MusicTasteAnalyzer({
       return;
     }
 
-    if (artists.length === 0 || tracks.length === 0 || albums.length === 0) {
-      setError("Not enough data to analyze. Please wait for data to load.");
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
 
     try {
-      const topArtists = artists
-        .slice(0, 5)
-        .map((a) => a.name)
-        .join(", ");
-      const topTracks = tracks
-        .slice(0, 5)
-        .map((t) => t.name)
-        .join(", ");
-      const topAlbums = albums
-        .slice(0, 5)
-        .map((a) => a.name)
-        .join(", ");
+      // Fetch long-term data directly from Spotify API
+      const [artistsResponse, tracksResponse] = await Promise.all([
+        fetch(
+          "https://api.spotify.com/v1/me/top/artists?time_range=long_term&limit=5",
+          {
+            headers: {
+              Authorization: `Bearer ${session?.accessToken}`,
+            },
+          }
+        ),
+        fetch(
+          "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5",
+          {
+            headers: {
+              Authorization: `Bearer ${session?.accessToken}`,
+            },
+          }
+        ),
+      ]);
 
-      const prompt = `You are a brutally honest music critic with a sharp wit and no filter. Your task is to roast this person's music taste based on their top 5 artists (${topArtists}), top 5 tracks (${topTracks}), and top 5 albums (${topAlbums}).
+      if (!artistsResponse.ok || !tracksResponse.ok) {
+        throw new Error("Failed to fetch top items");
+      }
 
-      Make wild, specific assumptions about their personality, lifestyle, and life choices based solely on their music taste. Be creative and funny, but keep it light-hearted. Include:
-      - Their fashion sense
+      const [artistsData, tracksData] = await Promise.all([
+        artistsResponse.json(),
+        tracksResponse.json(),
+      ]);
+
+      // Create a map of album IDs to play counts from top tracks
+      const albumPlayCounts = new Map<string, number>();
+      tracksData.items.forEach((track: SpotifyTrack) => {
+        const count = albumPlayCounts.get(track.album.id) || 0;
+        albumPlayCounts.set(track.album.id, count + 1);
+      });
+
+      // Sort albums by play count
+      const sortedAlbums = Array.from(albumPlayCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([albumId, playCount]) => {
+          const track = tracksData.items.find(
+            (item: SpotifyTrack) => item.album.id === albumId
+          );
+          return {
+            id: albumId,
+            name: track.album.name,
+            images: track.album.images,
+            artists: track.album.artists,
+            release_date: track.album.release_date,
+            total_tracks: track.album.total_tracks,
+            popularity: playCount,
+          };
+        });
+
+      const topArtists = artistsData.items
+        .map((a: SpotifyArtist) => a.name)
+        .join(", ");
+      const topTracks = tracksData.items
+        .map((t: SpotifyTrack) => t.name)
+        .join(", ");
+      const topAlbums = sortedAlbums.map((a) => a.name).join(", ");
+
+      const prompt = `You are a brutally honest music critic who only finds flaws in people's music taste with a sharp wit and no filter, your response should be in the form of a roast and use casual language. Your task is to roast this person's music taste based on their all-time top 5 artists (${topArtists}), top 5 tracks (${topTracks}), and top 5 albums (${topAlbums}).
+
+      Make wild, specific assumptions about their personality, lifestyle, and life choices based solely on their music taste. Be creative and funny and just roast, don't hold back. Include:
       - Their dating life
       - Their social media presence
+      - Chances of them being employed
       - Their questionable life decisions
       - Their taste in memes
       - Their most embarrassing moments

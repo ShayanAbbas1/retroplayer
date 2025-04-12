@@ -12,12 +12,16 @@ export interface SpotifyTrack {
   id: string;
   name: string;
   album: {
-    images: { url: string }[];
-  };
-  artists: {
+    id: string;
     name: string;
-  }[];
+    images: { url: string }[];
+    artists: { name: string }[];
+    release_date: string;
+    total_tracks: number;
+  };
+  artists: { name: string }[];
   popularity: number;
+  duration_ms?: number;
 }
 
 export interface SpotifyAlbum {

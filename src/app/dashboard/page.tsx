@@ -15,21 +15,6 @@ import AlbumsList from "@/components/AlbumsList";
 import { PopupProvider } from "@/contexts/PopupContext";
 import MusicTasteAnalyzer from "@/components/MusicTasteAnalyzer";
 
-interface SpotifyApiTrack {
-  id: string;
-  name: string;
-  album: {
-    id: string;
-    name: string;
-    images: { url: string }[];
-    artists: { name: string }[];
-    release_date: string;
-    total_tracks: number;
-  };
-  artists: { name: string }[];
-  popularity: number;
-}
-
 type TabType = "stats" | "analysis";
 
 export default function DashboardPage() {
@@ -39,11 +24,11 @@ export default function DashboardPage() {
   const [topArtists, setTopArtists] = useState<SpotifyArtist[]>([]);
   const [topTracks, setTopTracks] = useState<SpotifyTrack[]>([]);
   const [topAlbums, setTopAlbums] = useState<SpotifyAlbum[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>("stats");
   const [longTermArtists, setLongTermArtists] = useState<SpotifyArtist[]>([]);
   const [longTermTracks, setLongTermTracks] = useState<SpotifyTrack[]>([]);
   const [longTermAlbums, setLongTermAlbums] = useState<SpotifyAlbum[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>("stats");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -85,48 +70,41 @@ export default function DashboardPage() {
           tracksResponse.json(),
         ]);
 
-        if (range === "long_term") {
-          setLongTermArtists(artistsData.items);
-          setLongTermTracks(tracksData.items);
-          const uniqueAlbums = new Map<string, SpotifyAlbum>();
-          tracksData.items.forEach((track: SpotifyApiTrack) => {
-            if (
-              track.album &&
-              track.album.id &&
-              !uniqueAlbums.has(track.album.id)
-            ) {
-              uniqueAlbums.set(track.album.id, {
-                id: track.album.id,
-                name: track.album.name,
-                images: track.album.images,
-                artists: track.album.artists,
-                release_date: track.album.release_date,
-                total_tracks: track.album.total_tracks,
-              });
-            }
+        // Create a map of album IDs to play counts from top tracks
+        const albumPlayCounts = new Map<string, number>();
+        tracksData.items.forEach((track: SpotifyTrack) => {
+          const count = albumPlayCounts.get(track.album.id) || 0;
+          albumPlayCounts.set(track.album.id, count + 1);
+        });
+
+        // Sort albums by play count
+        const sortedAlbums = Array.from(albumPlayCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 50)
+          .map(([albumId, playCount]) => {
+            const track = tracksData.items.find(
+              (item: SpotifyTrack) => item.album.id === albumId
+            );
+            return {
+              id: albumId,
+              name: track.album.name,
+              images: track.album.images,
+              artists: track.album.artists,
+              release_date: track.album.release_date,
+              total_tracks: track.album.total_tracks,
+              popularity: playCount,
+            };
           });
-          setLongTermAlbums(Array.from(uniqueAlbums.values()));
-        } else {
+
+        // Update the appropriate state based on the time range
+        if (range === timeRange) {
           setTopArtists(artistsData.items);
           setTopTracks(tracksData.items);
-          const uniqueAlbums = new Map<string, SpotifyAlbum>();
-          tracksData.items.forEach((track: SpotifyApiTrack) => {
-            if (
-              track.album &&
-              track.album.id &&
-              !uniqueAlbums.has(track.album.id)
-            ) {
-              uniqueAlbums.set(track.album.id, {
-                id: track.album.id,
-                name: track.album.name,
-                images: track.album.images,
-                artists: track.album.artists,
-                release_date: track.album.release_date,
-                total_tracks: track.album.total_tracks,
-              });
-            }
-          });
-          setTopAlbums(Array.from(uniqueAlbums.values()));
+          setTopAlbums(sortedAlbums);
+        } else if (range === "long_term") {
+          setLongTermArtists(artistsData.items);
+          setLongTermTracks(tracksData.items);
+          setLongTermAlbums(sortedAlbums);
         }
       } catch (error) {
         console.error("Error fetching top items:", error);
@@ -135,9 +113,11 @@ export default function DashboardPage() {
       }
     };
 
-    // Fetch both current time range and long term data
+    // Fetch both current time range and long-term data
     fetchTopItems(timeRange);
-    fetchTopItems("long_term");
+    if (timeRange !== "long_term") {
+      fetchTopItems("long_term");
+    }
   }, [session?.accessToken, timeRange]);
 
   useEffect(() => {
@@ -264,6 +244,7 @@ export default function DashboardPage() {
                 artists={longTermArtists}
                 tracks={longTermTracks}
                 albums={longTermAlbums}
+                timeRange="long_term"
               />
             </div>
           )}
