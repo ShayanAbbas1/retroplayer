@@ -46,12 +46,17 @@ export default function MusicTasteAnalyzer({
         .map((a) => a.name)
         .join(", ");
 
-      const prompt = `Let's analyze *your* music taste with brutal honesty and a dash of mockery.  
-        Based on your top 5 artists (${topArtists}), top 5 tracks (${topTracks}), and top 5 albums (${topAlbums}), I'm going to tell you EXACTLY who you are — and I'm not holding back.  
-        I'll make wildly specific assumptions about your life choices, personality quirks, and fashion sense based entirely on your music. Expect uncomfortable accuracy, layered with playful exaggeration.  
-        Think of this as a musical intervention disguised as a roast. I'll toss in some music references that'll either make you feel seen… or completely exposed.  
-        Don't worry, it's (mostly) all in good fun. You might want to keep tissues nearby — whether for laughter or shame is up to you.  
-        Limit your savage insights to 200 words of musical judgment.`;
+      const prompt = `You are a brutally honest music critic with a sharp wit and no filter. Your task is to roast this person's music taste based on their top 5 artists (${topArtists}), top 5 tracks (${topTracks}), and top 5 albums (${topAlbums}).
+
+      Make wild, specific assumptions about their personality, lifestyle, and life choices based solely on their music taste. Be creative and funny, but keep it light-hearted. Include:
+      - Their fashion sense
+      - Their dating life
+      - Their social media presence
+      - Their questionable life decisions
+      - Their taste in memes
+      - Their most embarrassing moments
+      
+      Use a mix of playful exaggeration and uncomfortably accurate observations. Throw in some music references and puns. Keep it under 200 words.`;
 
       const response = await fetch(
         "https://api.mistral.ai/v1/chat/completions",
@@ -67,14 +72,14 @@ export default function MusicTasteAnalyzer({
               {
                 role: "system",
                 content:
-                  "You are a witty music critic with a great sense of humor. Your analysis should be entertaining and insightful, with a touch of sarcasm.",
+                  "You are a witty, sarcastic music critic who specializes in roasting people's music taste. Your roasts should be funny, creative, and slightly uncomfortable in their accuracy. Mix humor with sharp observations.",
               },
               {
                 role: "user",
                 content: prompt,
               },
             ],
-            temperature: 0.7,
+            temperature: 0.8,
             max_tokens: 500,
           }),
         }
@@ -93,7 +98,6 @@ export default function MusicTasteAnalyzer({
 
       const analysisText = data.choices[0].message.content;
       setAnalysis(analysisText);
-      // Cache the analysis in session storage with a unique key based on the data
       const cacheKey = `musicAnalysis_${artists[0]?.id}_${tracks[0]?.id}_${albums[0]?.id}`;
       sessionStorage.setItem(cacheKey, analysisText);
     } catch (error) {
@@ -109,7 +113,6 @@ export default function MusicTasteAnalyzer({
   };
 
   useEffect(() => {
-    // Create a unique cache key based on the first items
     const cacheKey = `musicAnalysis_${artists[0]?.id}_${tracks[0]?.id}_${albums[0]?.id}`;
     const cachedAnalysis = sessionStorage.getItem(cacheKey);
 
@@ -139,7 +142,7 @@ export default function MusicTasteAnalyzer({
       {isLoading ? (
         <div className="flex items-center justify-center py-8 space-x-3">
           <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-green-500"></div>
-          <p className="text-gray-300 text-lg">Analyzing your music taste...</p>
+          <p className="text-gray-300 text-lg">Preparing your roast...</p>
         </div>
       ) : error ? (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
@@ -153,7 +156,7 @@ export default function MusicTasteAnalyzer({
         </div>
       ) : analysis ? (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-start">
             <p className="text-gray-300 text-lg leading-relaxed whitespace-pre-line">
               {analysis}
             </p>
@@ -161,7 +164,7 @@ export default function MusicTasteAnalyzer({
               onClick={handleRegenerate}
               className="ml-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-white transition-colors"
             >
-              Regenerate
+              Get roasted again
             </button>
           </div>
         </div>

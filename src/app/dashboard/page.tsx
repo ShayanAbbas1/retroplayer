@@ -194,7 +194,7 @@ export default function DashboardPage() {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              AI Analysis
+              Want AI to roast your taste?
             </button>
           </div>
 
