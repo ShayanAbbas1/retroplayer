@@ -6,7 +6,7 @@ import { NextAuthProvider } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Spotify Stats",
+  title: "Spotify Playground",
   description: "View your Spotify statistics and top tracks",
 };
 

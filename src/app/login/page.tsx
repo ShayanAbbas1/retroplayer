@@ -53,7 +53,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-8">Spotify Stats</h1>
+        <h1 className="text-4xl font-bold text-white mb-8">
+          Spotify Playground
+        </h1>
         {errorParam && (
           <p className="text-red-500 mb-4">
             {errorParam === "OAuthCallback"

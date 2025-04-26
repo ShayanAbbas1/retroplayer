@@ -179,7 +179,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mx-auto"></div>
-          <p className="mt-4 text-white">Loading your Spotify stats...</p>
+          <p className="mt-4 text-white">Loading Spotify Playground...</p>
         </div>
       </div>
     );
@@ -194,7 +194,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-900 text-white">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Your Spotify Stats</h1>
+            <h1 className="text-3xl font-bold">Spotify Playground</h1>
             <button
               onClick={() => signOut()}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
