@@ -27,6 +27,9 @@ export default function DashboardPage() {
   const [longTermArtists, setLongTermArtists] = useState<SpotifyArtist[]>([]);
   const [longTermTracks, setLongTermTracks] = useState<SpotifyTrack[]>([]);
   const [longTermAlbums, setLongTermAlbums] = useState<SpotifyAlbum[]>([]);
+  const [shortTermArtists, setShortTermArtists] = useState<SpotifyArtist[]>([]);
+  const [shortTermTracks, setShortTermTracks] = useState<SpotifyTrack[]>([]);
+  const [shortTermAlbums, setShortTermAlbums] = useState<SpotifyAlbum[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("stats");
 
@@ -41,7 +44,6 @@ export default function DashboardPage() {
       if (!session?.accessToken) return;
 
       try {
-        setIsLoading(true);
         const [artistsResponse, tracksResponse] = await Promise.all([
           fetch(
             `https://api.spotify.com/v1/me/top/artists?time_range=${range}&limit=50`,
@@ -97,7 +99,11 @@ export default function DashboardPage() {
           });
 
         // Update the appropriate state based on the time range
-        if (range === timeRange) {
+        if (range === "short_term") {
+          setShortTermArtists(artistsData.items);
+          setShortTermTracks(tracksData.items);
+          setShortTermAlbums(sortedAlbums);
+        } else if (range === "medium_term") {
           setTopArtists(artistsData.items);
           setTopTracks(tracksData.items);
           setTopAlbums(sortedAlbums);
@@ -108,17 +114,59 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error("Error fetching top items:", error);
+      }
+    };
+
+    const fetchAllData = async () => {
+      if (!session?.accessToken) return;
+
+      try {
+        setIsLoading(true);
+        await Promise.all([
+          fetchTopItems("short_term"),
+          fetchTopItems("medium_term"),
+          fetchTopItems("long_term"),
+        ]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Fetch both current time range and long-term data
-    fetchTopItems(timeRange);
-    if (timeRange !== "long_term") {
-      fetchTopItems("long_term");
+    if (session?.accessToken) {
+      fetchAllData();
     }
-  }, [session?.accessToken, timeRange]);
+  }, [session?.accessToken]);
+
+  const getCurrentData = () => {
+    switch (timeRange) {
+      case "short_term":
+        return {
+          artists: shortTermArtists,
+          tracks: shortTermTracks,
+          albums: shortTermAlbums,
+        };
+      case "medium_term":
+        return {
+          artists: topArtists,
+          tracks: topTracks,
+          albums: topAlbums,
+        };
+      case "long_term":
+        return {
+          artists: longTermArtists,
+          tracks: longTermTracks,
+          albums: longTermAlbums,
+        };
+      default:
+        return {
+          artists: topArtists,
+          tracks: topTracks,
+          albums: topAlbums,
+        };
+    }
+  };
+
+  const currentData = getCurrentData();
 
   useEffect(() => {
     console.log("Top Artists:", topArtists);
@@ -218,21 +266,21 @@ export default function DashboardPage() {
                   <h2 className="text-xl font-semibold text-white mb-4">
                     Top Artists
                   </h2>
-                  <ArtistsList artists={topArtists} />
+                  <ArtistsList artists={currentData.artists} />
                 </div>
 
                 <div className="bg-gray-800 rounded-lg p-6">
                   <h2 className="text-xl font-semibold text-white mb-4">
                     Top Tracks
                   </h2>
-                  <TracksList tracks={topTracks} />
+                  <TracksList tracks={currentData.tracks} />
                 </div>
 
                 <div className="bg-gray-800 rounded-lg p-6">
                   <h2 className="text-xl font-semibold text-white mb-4">
                     Top Albums
                   </h2>
-                  <AlbumsList albums={topAlbums} />
+                  <AlbumsList albums={currentData.albums} />
                 </div>
               </div>
             </>
@@ -244,7 +292,6 @@ export default function DashboardPage() {
                 artists={longTermArtists}
                 tracks={longTermTracks}
                 albums={longTermAlbums}
-                timeRange="long_term"
               />
             </div>
           )}
