@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import { streamingDataService } from "../lib/streaming-data-service";
+import { useStreamingData } from "../contexts/StreamingDataContext";
 
 export function StreamingDataUpload() {
   const [isDragging, setIsDragging] = useState(false);
+  const { setData } = useStreamingData();
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -21,14 +23,16 @@ export function StreamingDataUpload() {
 
     const file = e.dataTransfer.files[0];
     if (file && file.name.endsWith(".zip")) {
-      await streamingDataService.processZipFile(file);
+      const data = await streamingDataService.processZipFile(file);
+      if (data != null) setData(data);
     }
   };
 
   const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.name.endsWith(".zip")) {
-      await streamingDataService.processZipFile(file);
+      const data = await streamingDataService.processZipFile(file);
+      if (data != null) setData(data);
     }
   };
 
@@ -53,7 +57,9 @@ export function StreamingDataUpload() {
           </li>
           <li>
             Click on{" "}
-            <span className="font-semibold">"Extended streaming history"</span>{" "}
+            <span className="font-semibold">
+              &quot;Extended streaming history&quot;
+            </span>{" "}
             and follow the instructions to request your data.
           </li>
           <li>

@@ -7,6 +7,8 @@ import { BehaviorSubject, Observable } from "rxjs";
 import { map } from "rxjs/operators";
 
 class StreamingDataService {
+  private static STORAGE_KEY = "spotify_streaming_data";
+
   private stateSubject = new BehaviorSubject<StreamingDataState>({
     data: [],
     isLoading: false,
@@ -14,6 +16,25 @@ class StreamingDataService {
   });
 
   private listeners: ((state: StreamingDataState) => void)[] = [];
+
+  constructor() {
+    // Rehydrate from sessionStorage if present
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem(StreamingDataService.STORAGE_KEY);
+      if (stored) {
+        try {
+          const data = JSON.parse(stored);
+          if (Array.isArray(data)) {
+            this.stateSubject.next({
+              data,
+              isLoading: false,
+              error: null,
+            });
+          }
+        } catch {}
+      }
+    }
+  }
 
   public getState(): StreamingDataState {
     return this.stateSubject.getValue();
@@ -36,7 +57,9 @@ class StreamingDataService {
     );
   }
 
-  public async processZipFile(file: File): Promise<void> {
+  public async processZipFile(
+    file: File
+  ): Promise<StreamingData[] | undefined> {
     this.stateSubject.next({
       ...this.stateSubject.getValue(),
       isLoading: true,
@@ -121,6 +144,7 @@ class StreamingDataService {
         isLoading: false,
         error: null,
       });
+      return combinedData;
     } catch (error) {
       console.error("Error processing zip file:", error);
       this.stateSubject.next({
@@ -129,45 +153,110 @@ class StreamingDataService {
         error:
           error instanceof Error ? error : new Error("Unknown error occurred"),
       });
+      return undefined;
     }
 
     this.notifyListeners();
   }
 
-  public getTopArtists$(): Observable<{ artist: string; count: number }[]> {
+  public getTopArtists$(): Observable<
+    { artist: string; count: number; durationMs: number }[]
+  > {
     return this.stateSubject.pipe(
       map((state: StreamingDataState) => {
-        const artistCounts = new Map<string, number>();
+        const artistCounts = new Map<
+          string,
+          { count: number; durationMs: number }
+        >();
 
         state.data.forEach((item: StreamingData) => {
           if (item.master_metadata_album_artist_name) {
-            const count =
-              artistCounts.get(item.master_metadata_album_artist_name) || 0;
-            artistCounts.set(item.master_metadata_album_artist_name, count + 1);
+            const prev = artistCounts.get(
+              item.master_metadata_album_artist_name
+            ) || { count: 0, durationMs: 0 };
+            artistCounts.set(item.master_metadata_album_artist_name, {
+              count: prev.count + 1,
+              durationMs: prev.durationMs + item.ms_played,
+            });
           }
         });
 
         return Array.from(artistCounts.entries())
-          .map(([artist, count]) => ({ artist, count }))
+          .map(([artist, { count, durationMs }]) => ({
+            artist,
+            count,
+            durationMs,
+          }))
           .sort((a, b) => b.count - a.count);
       })
     );
   }
 
-  public getTopTracks$(): Observable<{ track: string; count: number }[]> {
+  public getTopTracks$(): Observable<
+    { track: string; count: number; durationMs: number }[]
+  > {
     return this.stateSubject.pipe(
       map((state: StreamingDataState) => {
-        const trackCounts = new Map<string, number>();
+        const trackCounts = new Map<
+          string,
+          { count: number; durationMs: number }
+        >();
 
         state.data.forEach((item: StreamingData) => {
           if (item.master_metadata_track_name) {
-            const count = trackCounts.get(item.master_metadata_track_name) || 0;
-            trackCounts.set(item.master_metadata_track_name, count + 1);
+            const prev = trackCounts.get(item.master_metadata_track_name) || {
+              count: 0,
+              durationMs: 0,
+            };
+            trackCounts.set(item.master_metadata_track_name, {
+              count: prev.count + 1,
+              durationMs: prev.durationMs + item.ms_played,
+            });
           }
         });
 
         return Array.from(trackCounts.entries())
-          .map(([track, count]) => ({ track, count }))
+          .map(([track, { count, durationMs }]) => ({
+            track,
+            count,
+            durationMs,
+          }))
+          .sort((a, b) => b.count - a.count);
+      })
+    );
+  }
+
+  public getTopAlbums$(): Observable<
+    { album: string; count: number; durationMs: number }[]
+  > {
+    return this.stateSubject.pipe(
+      map((state: StreamingDataState) => {
+        const albumCounts = new Map<
+          string,
+          { count: number; durationMs: number }
+        >();
+
+        state.data.forEach((item: StreamingData) => {
+          if (item.master_metadata_album_album_name) {
+            const prev = albumCounts.get(
+              item.master_metadata_album_album_name
+            ) || {
+              count: 0,
+              durationMs: 0,
+            };
+            albumCounts.set(item.master_metadata_album_album_name, {
+              count: prev.count + 1,
+              durationMs: prev.durationMs + item.ms_played,
+            });
+          }
+        });
+
+        return Array.from(albumCounts.entries())
+          .map(([album, { count, durationMs }]) => ({
+            album,
+            count,
+            durationMs,
+          }))
           .sort((a, b) => b.count - a.count);
       })
     );

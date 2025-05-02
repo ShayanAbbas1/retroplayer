@@ -20,9 +20,27 @@ export default function VirtualList<T>({
   const [containerHeight, setContainerHeight] = useState(0);
 
   useEffect(() => {
-    if (containerRef.current) {
-      setContainerHeight(containerRef.current.clientHeight);
-    }
+    if (!containerRef.current) return;
+
+    const updateHeight = () => {
+      if (containerRef.current) {
+        setContainerHeight(containerRef.current.clientHeight);
+      }
+    };
+
+    updateHeight();
+
+    // Use ResizeObserver to track size changes
+    const resizeObserver = new window.ResizeObserver(updateHeight);
+    resizeObserver.observe(containerRef.current);
+
+    // Also update on window resize (for safety)
+    window.addEventListener("resize", updateHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateHeight);
+    };
   }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
