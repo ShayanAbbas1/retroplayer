@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@nivo/heatmap": "^0.93.0",
     "@types/jszip": "^3.4.0",
     "@types/next-auth": "^3.13.0",
     "@types/spotify-web-api-node": "^5.0.11",
