@@ -14,8 +14,10 @@ import TracksList from "@/components/TracksList";
 import AlbumsList from "@/components/AlbumsList";
 import { PopupProvider } from "@/contexts/PopupContext";
 import MusicTasteAnalyzer from "@/components/MusicTasteAnalyzer";
+import { StreamingDataUpload } from "@/components/streaming-data-upload";
+import { StreamingInsights } from "@/components/streaming-insights";
 
-type TabType = "stats" | "analysis";
+type TabType = "stats" | "analysis" | "streaming";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -224,6 +226,16 @@ export default function DashboardPage() {
             >
               Want AI to roast your taste?
             </button>
+            <button
+              onClick={() => setActiveTab("streaming")}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === "streaming"
+                  ? "bg-gray-800 text-white"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Streaming Insights
+            </button>
           </div>
 
           {activeTab === "stats" && (
@@ -257,7 +269,7 @@ export default function DashboardPage() {
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  All time
+                  Long Term
                 </button>
               </div>
 
@@ -293,6 +305,13 @@ export default function DashboardPage() {
                 tracks={longTermTracks}
                 albums={longTermAlbums}
               />
+            </div>
+          )}
+
+          {activeTab === "streaming" && (
+            <div className="mt-6 space-y-8">
+              <StreamingDataUpload />
+              <StreamingInsights />
             </div>
           )}
         </div>

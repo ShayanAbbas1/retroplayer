@@ -6,7 +6,7 @@ import { TimeRange } from "@/types/spotify";
 const timeRanges: { label: string; value: TimeRange }[] = [
   { label: "Last 4 weeks", value: "short_term" },
   { label: "Last 6 months", value: "medium_term" },
-  { label: "All time", value: "long_term" },
+  { label: "Long Term", value: "long_term" },
 ];
 
 export default function TimeRangeFilter() {
