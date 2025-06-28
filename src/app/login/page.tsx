@@ -3,6 +3,7 @@
 import { signIn, signOut } from "next-auth/react";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +98,14 @@ export default function LoginPage() {
             "Login with Spotify"
           )}
         </button>
+        <div className="mt-8">
+          <Link
+            href="/streaming-insights"
+            className="px-6 py-3 bg-gray-700 text-white rounded-full text-lg font-medium hover:bg-gray-800 transition-colors"
+          >
+            Or analyze your streaming history
+          </Link>
+        </div>
       </div>
     </div>
   );
