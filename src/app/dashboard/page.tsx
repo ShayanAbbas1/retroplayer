@@ -218,16 +218,18 @@ export default function DashboardPage() {
               >
                 Your Stats
               </button>
-              <button
-                onClick={() => setActiveTab("analysis")}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === "analysis"
-                    ? "bg-gray-800 text-white"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Want AI to roast your taste?
-              </button>
+              {false && (
+                <button
+                  onClick={() => setActiveTab("analysis")}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    activeTab === "analysis"
+                      ? "bg-gray-800 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Want AI to roast your taste?
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("streaming")}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -300,7 +302,7 @@ export default function DashboardPage() {
               </>
             )}
 
-            {activeTab === "analysis" && (
+            {false && activeTab === "analysis" && (
               <div className="mt-6">
                 <MusicTasteAnalyzer
                   artists={longTermArtists}
