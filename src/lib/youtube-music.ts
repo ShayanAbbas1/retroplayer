@@ -1,6 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 
-export const youtubeMusicClient = new OAuth2Client(
+export const youtubeMusicClients = new OAuth2Client(
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
   process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
