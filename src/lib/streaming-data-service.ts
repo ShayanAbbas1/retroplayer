@@ -71,56 +71,37 @@ class StreamingDataService {
       const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(file);
 
-      console.log("Zip file loaded, processing files...");
-      console.log("Files in zip:", Object.keys(zip.files));
 
       const processFile = async (
         filename: string,
         zipFile: JSZip.JSZipObject
       ): Promise<StreamingData[]> => {
-        console.log("Processing file:", filename);
         if (
           !filename.includes("Streaming_History_Audio_") ||
           !filename.endsWith(".json")
         ) {
-          console.log(`Skipping file: ${filename}`);
           return [];
         }
 
-        console.log(`Processing file: ${filename}`);
         const content = await zipFile.async("text");
-        console.log(`File content length: ${content.length}`);
 
         let jsonData;
         try {
           jsonData = JSON.parse(content);
-          console.log(
-            `Parsed JSON data type: ${
-              Array.isArray(jsonData) ? "array" : typeof jsonData
-            }`
-          );
         } catch (error) {
           console.error(`Error parsing JSON in ${filename}:`, error);
           return [];
         }
 
         const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData];
-        console.log(`Found ${dataArray.length} entries in ${filename}`);
 
-        const validData = dataArray.filter((item): item is StreamingData => {
-          const isValid =
+        return dataArray.filter(
+          (item): item is StreamingData =>
             typeof item === "object" &&
             item !== null &&
             "ts" in item &&
-            "ms_played" in item;
-          if (!isValid) {
-            console.log(`Invalid entry in ${filename}:`, item);
-          }
-          return isValid;
-        });
-
-        console.log(`Valid entries in ${filename}: ${validData.length}`);
-        return validData;
+            "ms_played" in item
+        );
       };
 
       const filePromises = Object.entries(zip.files).map(
@@ -129,11 +110,8 @@ class StreamingDataService {
       );
 
       const results = await Promise.all(filePromises);
-      console.log("Results from all files:", results);
 
       const combinedData = results.flat();
-      console.log("Combined data:", combinedData);
-      console.log(`Total valid entries processed: ${combinedData.length}`);
 
       if (combinedData.length === 0) {
         throw new Error("No valid streaming data found in the zip file");

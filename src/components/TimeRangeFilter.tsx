@@ -29,7 +29,7 @@ export default function TimeRangeFilter() {
           onClick={() => handleTimeRangeChange(range.value)}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
             currentTimeRange === range.value
-              ? "bg-green-500 text-white"
+              ? "win-selected"
               : "bg-gray-800 text-gray-300 hover:bg-gray-700"
           }`}
         >

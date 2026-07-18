@@ -8,9 +8,9 @@ export default function StreamingInsightsPage() {
   return (
     <StreamingDataProvider>
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-4">
-          Your Spotify Streaming Insights
-        </h1>
+        <div className="win-window">
+        <div className="win-titlebar">Your Spotify Streaming Insights</div>
+        <div className="px-4 py-6">
         <div className="prose max-w-none mb-8">
           <p className="text-gray-600 mb-4">
             This feature allows you to analyze your complete Spotify listening
@@ -49,6 +49,8 @@ export default function StreamingInsightsPage() {
         <div className="space-y-8">
           <StreamingDataUpload />
           <StreamingInsights />
+        </div>
+        </div>
         </div>
       </div>
     </StreamingDataProvider>

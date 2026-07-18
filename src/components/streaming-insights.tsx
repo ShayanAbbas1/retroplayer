@@ -178,7 +178,7 @@ export function StreamingInsights() {
               key={tab.key}
               className={`px-4 py-2 rounded font-medium transition-colors ${
                 activeTab === tab.key
-                  ? "bg-green-600 text-white"
+                  ? "win-selected"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-600"
               }`}
               onClick={() => setActiveTab(tab.key as TabKey)}

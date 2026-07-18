@@ -17,24 +17,29 @@ import MusicTasteAnalyzer from "@/components/MusicTasteAnalyzer";
 import { StreamingDataUpload } from "@/components/streaming-data-upload";
 import { StreamingInsights } from "@/components/streaming-insights";
 import { StreamingDataProvider } from "@/contexts/StreamingDataContext";
+import RetroPlayer from "@/components/retro-player";
 
-type TabType = "stats" | "analysis" | "streaming";
+type TabType = "player" | "stats" | "analysis" | "streaming";
+
+interface TopData {
+  artists: SpotifyArtist[];
+  tracks: SpotifyTrack[];
+  albums: SpotifyAlbum[];
+}
+
+const EMPTY_TOP: TopData = { artists: [], tracks: [], albums: [] };
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [timeRange, setTimeRange] = useState<TimeRange>("medium_term");
-  const [topArtists, setTopArtists] = useState<SpotifyArtist[]>([]);
-  const [topTracks, setTopTracks] = useState<SpotifyTrack[]>([]);
-  const [topAlbums, setTopAlbums] = useState<SpotifyAlbum[]>([]);
-  const [longTermArtists, setLongTermArtists] = useState<SpotifyArtist[]>([]);
-  const [longTermTracks, setLongTermTracks] = useState<SpotifyTrack[]>([]);
-  const [longTermAlbums, setLongTermAlbums] = useState<SpotifyAlbum[]>([]);
-  const [shortTermArtists, setShortTermArtists] = useState<SpotifyArtist[]>([]);
-  const [shortTermTracks, setShortTermTracks] = useState<SpotifyTrack[]>([]);
-  const [shortTermAlbums, setShortTermAlbums] = useState<SpotifyAlbum[]>([]);
+  const [topData, setTopData] = useState<Record<TimeRange, TopData>>({
+    short_term: EMPTY_TOP,
+    medium_term: EMPTY_TOP,
+    long_term: EMPTY_TOP,
+  });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>("stats");
+  const [activeTab, setActiveTab] = useState<TabType>("player");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -101,20 +106,14 @@ export default function DashboardPage() {
             };
           });
 
-        // Update the appropriate state based on the time range
-        if (range === "short_term") {
-          setShortTermArtists(artistsData.items);
-          setShortTermTracks(tracksData.items);
-          setShortTermAlbums(sortedAlbums);
-        } else if (range === "medium_term") {
-          setTopArtists(artistsData.items);
-          setTopTracks(tracksData.items);
-          setTopAlbums(sortedAlbums);
-        } else if (range === "long_term") {
-          setLongTermArtists(artistsData.items);
-          setLongTermTracks(tracksData.items);
-          setLongTermAlbums(sortedAlbums);
-        }
+        setTopData((prev) => ({
+          ...prev,
+          [range]: {
+            artists: artistsData.items,
+            tracks: tracksData.items,
+            albums: sortedAlbums,
+          },
+        }));
       } catch (error) {
         console.error("Error fetching top items:", error);
       }
@@ -140,42 +139,7 @@ export default function DashboardPage() {
     }
   }, [session?.accessToken]);
 
-  const getCurrentData = () => {
-    switch (timeRange) {
-      case "short_term":
-        return {
-          artists: shortTermArtists,
-          tracks: shortTermTracks,
-          albums: shortTermAlbums,
-        };
-      case "medium_term":
-        return {
-          artists: topArtists,
-          tracks: topTracks,
-          albums: topAlbums,
-        };
-      case "long_term":
-        return {
-          artists: longTermArtists,
-          tracks: longTermTracks,
-          albums: longTermAlbums,
-        };
-      default:
-        return {
-          artists: topArtists,
-          tracks: topTracks,
-          albums: topAlbums,
-        };
-    }
-  };
-
-  const currentData = getCurrentData();
-
-  useEffect(() => {
-    console.log("Top Artists:", topArtists);
-    console.log("Top Tracks:", topTracks);
-    console.log("Top Albums:", topAlbums);
-  }, [topArtists, topTracks, topAlbums]);
+  const currentData = topData[timeRange];
 
   if (status === "loading" || isLoading) {
     return (
@@ -195,24 +159,32 @@ export default function DashboardPage() {
   return (
     <StreamingDataProvider>
       <PopupProvider>
-        <div className="min-h-screen bg-gray-900 text-white">
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">Spotify Playground</h1>
-              <button
-                onClick={() => signOut()}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-              >
+        <div className="min-h-screen py-8 px-4">
+          <div className="win-window max-w-7xl mx-auto">
+            <div className="win-titlebar flex justify-between items-center">
+              <span>Spotify Playground</span>
+              <button onClick={() => signOut()} className="px-3 text-[11px]">
                 Sign Out
               </button>
             </div>
+            <div className="px-4 py-6">
 
             <div className="flex space-x-4 mb-6">
+              <button
+                onClick={() => setActiveTab("player")}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === "player"
+                    ? "win-selected"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                Player
+              </button>
               <button
                 onClick={() => setActiveTab("stats")}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   activeTab === "stats"
-                    ? "bg-gray-800 text-white"
+                    ? "win-selected"
                     : "text-gray-400 hover:text-white"
                 }`}
               >
@@ -223,7 +195,7 @@ export default function DashboardPage() {
                   onClick={() => setActiveTab("analysis")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeTab === "analysis"
-                      ? "bg-gray-800 text-white"
+                      ? "win-selected"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -234,12 +206,18 @@ export default function DashboardPage() {
                 onClick={() => setActiveTab("streaming")}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   activeTab === "streaming"
-                    ? "bg-gray-800 text-white"
+                    ? "win-selected"
                     : "text-gray-400 hover:text-white"
                 }`}
               >
                 Streaming Insights
               </button>
+            </div>
+
+            {/* Always mounted: unmounting disconnects the Web Playback SDK
+                and kills the audio when switching tabs. */}
+            <div className={activeTab === "player" ? "mt-10" : "hidden"}>
+              <RetroPlayer />
             </div>
 
             {activeTab === "stats" && (
@@ -249,7 +227,7 @@ export default function DashboardPage() {
                     onClick={() => setTimeRange("short_term")}
                     className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                       timeRange === "short_term"
-                        ? "bg-gray-800 text-white border-t border-l border-r border-gray-700"
+                        ? "win-selected"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
@@ -259,7 +237,7 @@ export default function DashboardPage() {
                     onClick={() => setTimeRange("medium_term")}
                     className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                       timeRange === "medium_term"
-                        ? "bg-gray-800 text-white border-t border-l border-r border-gray-700"
+                        ? "win-selected"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
@@ -269,7 +247,7 @@ export default function DashboardPage() {
                     onClick={() => setTimeRange("long_term")}
                     className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                       timeRange === "long_term"
-                        ? "bg-gray-800 text-white border-t border-l border-r border-gray-700"
+                        ? "win-selected"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
@@ -305,9 +283,9 @@ export default function DashboardPage() {
             {false && activeTab === "analysis" && (
               <div className="mt-6">
                 <MusicTasteAnalyzer
-                  artists={longTermArtists}
-                  tracks={longTermTracks}
-                  albums={longTermAlbums}
+                  artists={topData.long_term.artists}
+                  tracks={topData.long_term.tracks}
+                  albums={topData.long_term.albums}
                 />
               </div>
             )}
@@ -318,6 +296,7 @@ export default function DashboardPage() {
                 <StreamingInsights />
               </div>
             )}
+            </div>
           </div>
         </div>
       </PopupProvider>
