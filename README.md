@@ -1,36 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Spotify Playground
 
-## Getting Started
+A Spotify client that looks like it's from 2001. Win98 chrome, a pixel-faithful Winamp 2.x player, and your real library behind it — plus analytics over your full listening history that Spotify doesn't surface.
 
-First, run the development server:
+## What it does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+**Retro player** — a Winamp-skinned player playing your actual Spotify library. Browse your playlists and Liked Songs, search, click a track to play it with the rest of the results queued behind it, like and unlike, add what's playing to a playlist. The whole app is Win98: teal desktop, silver beveled windows, navy title bars, Tahoma.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Your stats** — top artists, tracks, and albums across short, medium, and long time ranges, with detail popups.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Streaming insights** — Spotify's own stats only reach back so far. Request your full data export from Spotify, upload the zip here, and it becomes a listening heatmap and multi-year trend graphs covering everything you've ever played. The zip is read in your browser and never uploaded anywhere.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Getting access
 
-## Learn More
+The Spotify app is in development mode, which caps it at **25 allowlisted users** — accounts have to be added by hand before login will work. Open an issue if you want in.
 
-To learn more about Next.js, take a look at the following resources:
+You also need **Spotify Premium**. Spotify's playback SDK refuses to stream for free accounts, so the player won't work without it; the stats and streaming insights will.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Known limits
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Visualizers are simulated rather than audio-reactive — Spotify's audio is DRM'd, so nothing can read the actual waveform.
+- Long sessions need an occasional re-login.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Running it locally, environment setup, and architecture: [AGENTS.md](AGENTS.md).

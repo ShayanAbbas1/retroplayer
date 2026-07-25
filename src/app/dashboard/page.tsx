@@ -13,13 +13,12 @@ import ArtistsList from "@/components/ArtistsList";
 import TracksList from "@/components/TracksList";
 import AlbumsList from "@/components/AlbumsList";
 import { PopupProvider } from "@/contexts/PopupContext";
-import MusicTasteAnalyzer from "@/components/MusicTasteAnalyzer";
 import { StreamingDataUpload } from "@/components/streaming-data-upload";
 import { StreamingInsights } from "@/components/streaming-insights";
 import { StreamingDataProvider } from "@/contexts/StreamingDataContext";
 import RetroPlayer from "@/components/retro-player";
 
-type TabType = "player" | "stats" | "analysis" | "streaming";
+type TabType = "player" | "stats" | "streaming";
 
 interface TopData {
   artists: SpotifyArtist[];
@@ -190,18 +189,6 @@ export default function DashboardPage() {
               >
                 Your Stats
               </button>
-              {false && (
-                <button
-                  onClick={() => setActiveTab("analysis")}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === "analysis"
-                      ? "win-selected"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Want AI to roast your taste?
-                </button>
-              )}
               <button
                 onClick={() => setActiveTab("streaming")}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -278,16 +265,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </>
-            )}
-
-            {false && activeTab === "analysis" && (
-              <div className="mt-6">
-                <MusicTasteAnalyzer
-                  artists={topData.long_term.artists}
-                  tracks={topData.long_term.tracks}
-                  albums={topData.long_term.albums}
-                />
-              </div>
             )}
 
             {activeTab === "streaming" && (
