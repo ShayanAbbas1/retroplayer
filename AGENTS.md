@@ -43,11 +43,32 @@ Spotify app is in **development mode**: max 25 allowlisted users, added manually
 
 ## Known gotchas (read before touching auth/playback)
 
-1. **No token refresh.** `authOptions.ts` stores the access token in the JWT but never refreshes it; Spotify tokens expire after 1 hour while the session lasts 30 days. Must be fixed before any long-lived playback feature ships.
-2. **Playback needs extra scopes.** Current scopes are read-only. The Web Playback SDK requires `streaming` and `user-modify-playback-state` added to the scope string in `authOptions.ts`. Users must re-consent after a scope change.
-3. **Web Playback SDK = Premium only.** Free-tier users can't stream in-browser. Degrade gracefully.
-4. **Spotify audio is DRM'd** — no Web Audio access to the stream, so visualizers must be simulated, not audio-reactive. The audio-features/audio-analysis endpoints are dead for new apps; don't design around them.
-5. `authOptions.ts` has `debug: true` and verbose `console.log` in every callback — Cursor-era leftovers, fine to strip.
+1. **Token refresh works — don't re-implement it.** (Verified end to end 2026-08-14; this
+   entry previously claimed the opposite and was wrong.) The JWT callback in
+   `authOptions.ts` calls `isExpired` / `refreshSpotifyToken` from `src/lib/auth.ts`.
+   `expires_at` is absolute **epoch seconds** and is handled in consistent units
+   throughout. Every `GET /api/auth/session` re-runs the callback and re-sets the cookie,
+   so each `getToken()` is a live refresh opportunity. On failure, `token.error` →
+   `session.error` → `retro-player.tsx` re-triggers `signIn`.
+2. **Playback scopes are already granted.** The `authorization` block in `authOptions.ts`
+   overrides the provider default and includes `streaming`, `user-modify-playback-state`,
+   `user-library-modify` and the playlist-modify scopes. (Spotify's auth-code flow always
+   returns a `refresh_token`; `access_type=offline` is a Google-ism and is not needed.)
+   Users must still re-consent whenever the scope string changes.
+3. **The SDK re-fetches its token per call.** `getOAuthToken` in `use-spotify-player.ts`
+   invokes `fetchAccessToken()` on every SDK request rather than capturing one at
+   construction — this is why playback survives the 1-hour mark. Don't "optimize" it into
+   a captured variable.
+4. **Web Playback SDK = Premium only.** Free-tier users can't stream in-browser. Degrade gracefully.
+5. **Spotify audio is DRM'd** — no Web Audio access to the stream, so visualizers must be simulated, not audio-reactive. The audio-features/audio-analysis endpoints are dead for new apps; don't design around them.
+6. **List failures surface, single-value ones don't.** (Fixed 2026-08-14; this entry used to
+   describe the gap.) Every read in `spotify-client.ts` goes through a private `request()`
+   that returns `{ data, error }` — `error: "auth"` for a 401, `"failed"` otherwise — and
+   `Page<T>` carries it up to the library browser's status bar, so a dead session no longer
+   renders as an empty library. `isTrackLiked` and the `apiSend` write paths still collapse
+   failure into a falsy answer on purpose (marked `ponytail:`); if you add a read that
+   renders a list, propagate `error` like the others do. `SessionProvider` re-fetches every
+   300s (`providers.tsx`), which is also what re-runs the token refresh on an idle tab.
 
 ## Working conventions
 
