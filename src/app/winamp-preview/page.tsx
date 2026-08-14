@@ -14,6 +14,7 @@ export default function Preview() {
           name: "Paranoid Android",
           artists: "Radiohead",
           albumName: "OK Computer",
+          albumUri: "spotify:album:preview",
           albumArtUrl: "",
           uri: "spotify:track:preview",
         }}

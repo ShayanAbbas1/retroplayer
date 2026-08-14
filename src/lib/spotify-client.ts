@@ -6,6 +6,10 @@ export interface TrackResult {
   name: string;
   artists: string;
   durationMs: number;
+  album: string;
+  // "" for a track Spotify handed us without its album (simplified album
+  // tracks) — the "Go to Album" entry is disabled in that case
+  albumUri: string;
 }
 
 // Saved albums have the same shape (uri/name/track count/cover), so they reuse
@@ -15,6 +19,7 @@ export interface PlaylistResult {
   name: string;
   trackCount: number;
   image?: string;
+  artists?: string; // albums carry artists; playlists don't
 }
 
 // "auth" = the token in hand is dead and the refresh behind getToken() could not
@@ -38,6 +43,7 @@ interface SpotifyTrackItem {
   name: string;
   artists?: { name: string }[];
   duration_ms?: number;
+  album?: { uri?: string; name?: string };
 }
 
 interface SpotifyPlaylistItem {
@@ -46,6 +52,7 @@ interface SpotifyPlaylistItem {
   tracks?: { total?: number };
   total_tracks?: number; // albums carry the count here instead
   images?: SpotifyImage[];
+  artists?: { name: string }[];
 }
 
 // Spotify returns images[] largest-first; pick the smallest one still >=
@@ -62,12 +69,17 @@ export function pickImage(
   return images[0].url;
 }
 
+const joinArtists = (artists: { name: string }[] | undefined) =>
+  (artists ?? []).map((a) => a.name).join(", ");
+
 export function mapTrackItems(items: SpotifyTrackItem[] | undefined): TrackResult[] {
   return (items ?? []).map((t) => ({
     uri: t.uri,
     name: t.name,
-    artists: (t.artists ?? []).map((a) => a.name).join(", "),
+    artists: joinArtists(t.artists),
     durationMs: t.duration_ms ?? 0,
+    album: t.album?.name ?? "",
+    albumUri: t.album?.uri ?? "",
   }));
 }
 
@@ -81,6 +93,7 @@ export function mapPlaylistItems(
       name: p.name,
       trackCount: p.tracks?.total ?? p.total_tracks ?? 0,
       image: pickImage(p.images, 48),
+      artists: p.artists?.length ? joinArtists(p.artists) : undefined,
     }));
 }
 
@@ -130,18 +143,30 @@ async function apiSend(
   return res.ok;
 }
 
-export async function searchTracks(
+// What the search box is pointed at. "all" asks for both in one request —
+// Spotify answers a multi-type search with a `tracks` and an `albums` block, so
+// both kinds cost a single call.
+export type SearchType = "all" | "track" | "album";
+
+export async function search(
   query: string,
-  accessToken: string
-): Promise<Page<TrackResult>> {
+  accessToken: string,
+  type: SearchType = "all"
+): Promise<{ tracks: Page<TrackResult>; albums: Page<PlaylistResult> }> {
   const { data, error } = await request(
-    `search?type=track&limit=20&q=${encodeURIComponent(query)}`,
+    `search?type=${type === "all" ? "track,album" : type}&limit=20&q=${encodeURIComponent(query)}`,
     accessToken
   );
-  const items = mapTrackItems(
-    (data as { tracks?: { items?: SpotifyTrackItem[] } } | null)?.tracks?.items
-  );
-  return { items, total: items.length, error };
+  const res = data as {
+    tracks?: { items?: SpotifyTrackItem[] };
+    albums?: { items?: (SpotifyPlaylistItem | null)[] };
+  } | null;
+  const tracks = mapTrackItems(res?.tracks?.items);
+  const albums = mapPlaylistItems(res?.albums?.items);
+  return {
+    tracks: { items: tracks, total: tracks.length, error },
+    albums: { items: albums, total: albums.length, error },
+  };
 }
 
 export function pagedPath(path: string, offset: number, limit: number): string {
@@ -233,12 +258,14 @@ export async function getPlaylistTracks(
   };
 }
 
-// Album tracks come back "simplified" — no album object on each track — but the
-// browser already knows the album it opened, so nothing needs carrying down.
+// Album tracks come back "simplified" — no album object on each track — so the
+// album the caller opened is stamped back on, which is what fills the Album
+// column and keeps "Go to Album" live for these rows too.
 export async function getAlbumTracks(
   albumUri: string,
   accessToken: string,
-  offset = 0
+  offset = 0,
+  albumName = ""
 ): Promise<Page<TrackResult>> {
   const page = await getPage<SpotifyTrackItem | null>(
     `albums/${uriId(albumUri)}/tracks`,
@@ -247,7 +274,11 @@ export async function getAlbumTracks(
     accessToken
   );
   return {
-    items: mapTrackItems(compact(page.items)),
+    items: mapTrackItems(compact(page.items)).map((t) => ({
+      ...t,
+      album: albumName,
+      albumUri,
+    })),
     total: page.total,
     error: page.error,
   };
