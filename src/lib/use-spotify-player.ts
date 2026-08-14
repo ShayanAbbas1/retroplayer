@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pickImage, type SpotifyImage } from "@/lib/spotify-client";
+import { parseVolume, readStored, VOLUME_KEY, writeStored } from "@/lib/persist";
+
+const DEFAULT_VOLUME = 0.5;
+const storedVolume = () => parseVolume(readStored(VOLUME_KEY), DEFAULT_VOLUME);
 
 export type PlayerStatus =
   | "loading"
@@ -102,7 +107,7 @@ interface WebPlaybackState {
       name: string;
       uri: string;
       artists: { name: string }[];
-      album: { name: string; images: { url: string }[] };
+      album: { name: string; images: SpotifyImage[] };
     };
   };
 }
@@ -123,7 +128,7 @@ export function useSpotifyPlayer(): SpotifyPlayerState {
   const [paused, setPaused] = useState(true);
   const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
-  const [volume, setVolume] = useState(0.5);
+  const [volume, setVolume] = useState(storedVolume);
 
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const anchorRef = useRef<PositionAnchor | null>(null);
@@ -137,7 +142,7 @@ export function useSpotifyPlayer(): SpotifyPlayerState {
         getOAuthToken: (cb) => {
           fetchAccessToken().then(cb);
         },
-        volume: 0.5,
+        volume: storedVolume(),
       });
       playerRef.current = player;
 
@@ -154,7 +159,7 @@ export function useSpotifyPlayer(): SpotifyPlayerState {
           name: t.name,
           artists: t.artists.map((a) => a.name).join(", "),
           albumName: t.album.name,
-          albumArtUrl: t.album.images[0]?.url ?? "",
+          albumArtUrl: pickImage(t.album.images, 64) ?? "",
           uri: t.uri,
         });
         setPaused(state.paused);
@@ -232,6 +237,7 @@ export function useSpotifyPlayer(): SpotifyPlayerState {
     setVolume: (v) => {
       playerRef.current?.setVolume(v);
       setVolume(v);
+      writeStored(VOLUME_KEY, String(v));
     },
   };
 
