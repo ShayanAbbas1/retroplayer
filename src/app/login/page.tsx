@@ -46,7 +46,7 @@ function LoginContent() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="win-window w-full max-w-sm">
-        <div className="win-titlebar">Spotify Playground</div>
+        <div className="win-titlebar">RetroPlayer</div>
         <div className="p-6 text-center space-y-4">
           <h1 className="text-xl font-bold">Welcome</h1>
           <p>Sign in with your Spotify account to continue.</p>

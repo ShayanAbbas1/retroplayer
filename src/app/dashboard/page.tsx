@@ -145,7 +145,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mx-auto"></div>
-          <p className="mt-4 text-white">Loading Spotify Playground...</p>
+          <p className="mt-4 text-white">Loading RetroPlayer...</p>
         </div>
       </div>
     );
@@ -161,7 +161,7 @@ export default function DashboardPage() {
         <div className="min-h-screen py-8 px-4">
           <div className="win-window max-w-7xl mx-auto">
             <div className="win-titlebar flex justify-between items-center">
-              <span>Spotify Playground</span>
+              <span>RetroPlayer</span>
               <button onClick={() => signOut()} className="px-3 text-[11px]">
                 Sign Out
               </button>

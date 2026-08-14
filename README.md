@@ -1,4 +1,4 @@
-# Spotify Playground
+# RetroPlayer
 
 A Spotify client that looks like it's from 2001. Win98 chrome, a pixel-faithful Winamp 2.x player, and your real library behind it — plus analytics over your full listening history that Spotify doesn't surface.
 
@@ -6,7 +6,7 @@ A Spotify client that looks like it's from 2001. Win98 chrome, a pixel-faithful 
 
 ## What it does
 
-**Retro player** — a Winamp-skinned player playing your actual Spotify library. Browse your playlists and Liked Songs, search, click a track to play it with the rest of the results queued behind it, like and unlike, add what's playing to a playlist. The whole app is Win98: teal desktop, silver beveled windows, navy title bars, Tahoma.
+**The player** — a Winamp-skinned player playing your actual Spotify library. Browse your playlists and Liked Songs, search, click a track to play it with the rest of the results queued behind it, like and unlike, add what's playing to a playlist. The whole app is Win98: teal desktop, silver beveled windows, navy title bars, Tahoma.
 
 **Your stats** — top artists, tracks, and albums across short, medium, and long time ranges, with detail popups.
 

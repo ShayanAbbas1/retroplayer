@@ -3,7 +3,7 @@ import "./globals.css";
 import { NextAuthProvider } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Spotify Playground",
+  title: "RetroPlayer",
   description: "View your Spotify statistics and top tracks",
 };
 

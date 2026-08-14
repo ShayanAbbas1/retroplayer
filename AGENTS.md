@@ -1,4 +1,4 @@
-# spotify-playground — Agent Guide
+# retroplayer — Agent Guide
 
 Personal Spotify stats dashboard, now evolving into a **retro (Win98-styled) Spotify client** (see FEATURES.md). Owner: Shayan (hobby project, solo dev, AI-assisted). Originally handwritten + Cursor-assisted in 2025; from July 2026 onward development is agent-driven.
 
