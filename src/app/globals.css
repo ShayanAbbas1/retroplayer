@@ -64,6 +64,8 @@ body {
     color: #000;
     border: 2px solid;
     border-color: #fff #6d6a65 #6d6a65 #fff;
+    cursor: default;
+    user-select: none;
   }
   button:active {
     border-color: #6d6a65 #fff #fff #6d6a65;
@@ -75,6 +77,14 @@ body {
     color: #000;
     border: 2px solid;
     border-color: #6d6a65 #fff #fff #6d6a65;
+  }
+  /* chrome (button, .win-*) sets cursor:default/user-select:none; text
+     controls must win back the I-beam and selection even when nested
+     inside one of those blocks. */
+  input,
+  textarea {
+    cursor: text;
+    user-select: text;
   }
 }
 
@@ -91,23 +101,63 @@ body {
   font-weight: bold;
   font-size: 13px;
   padding: 3px 6px;
+  cursor: default;
+  user-select: none;
 }
 .win-inset {
   background: #fff;
   border: 2px solid;
   border-color: #6d6a65 #fff #fff #6d6a65;
 }
-.win-selected {
+/* descendants too, else a `text-gray-*` child stays grey on the navy bar */
+.win-selected,
+.win-selected * {
   background: #000080 !important;
   color: #fff !important;
+  cursor: default;
+  user-select: none;
+}
+/* popup menu: raised chrome with the 1px outline Win98 draws around menus */
+.win-menu {
+  background: #d4d0c8;
+  border: 2px solid;
+  border-color: #fff #404040 #404040 #fff;
+  outline: 1px solid #000;
+  cursor: default;
+  user-select: none;
+}
+/* status bar panel: sunken like win-inset but on the chrome ground, not white */
+.win-statusbar {
+  background: #d4d0c8;
+  border: 2px solid;
+  border-color: #6d6a65 #fff #fff #6d6a65;
+  cursor: default;
+  user-select: none;
 }
 /* listbox row: flat by default, navy selection bar on hover */
 .win-listrow {
   background: transparent;
   border: none;
+  cursor: default;
+  user-select: none;
 }
 .win-listrow:hover,
 .win-listrow:hover * {
   background: #000080;
   color: #fff;
+}
+/* text controls stay editable even nested inside chrome that disables
+   selection above (e.g. a search box in a titlebar or listrow). */
+.win-titlebar input,
+.win-titlebar textarea,
+.win-menu input,
+.win-menu textarea,
+.win-statusbar input,
+.win-statusbar textarea,
+.win-listrow input,
+.win-listrow textarea,
+.win-selected input,
+.win-selected textarea {
+  cursor: text;
+  user-select: text;
 }
