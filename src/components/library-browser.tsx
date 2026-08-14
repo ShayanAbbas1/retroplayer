@@ -52,7 +52,6 @@ const PAGE_ROWS = 18; // list is 380px tall at 20px per row
 const TYPE_AHEAD_RESET_MS = 800;
 const SCROLL_SLACK = 60; // px from the bottom that pulls the next page
 
-type Scope = "spotify" | "list" | "library";
 type LibraryRow = PlaylistResult & { kind: "Playlist" | "Album" };
 type Source = { uri: string; name: string };
 // one popup, two flavours — the same close-on-outside-click state serves both
@@ -178,8 +177,12 @@ export default function LibraryBrowser({
   nowPlayingUri,
   openAlbum,
 }: Props) {
+  // three boxes, three scopes — where you type is what you search: the sources
+  // pane filters itself, the toolbar box hits the Spotify API, the one over the
+  // list narrows the open playlist/album
   const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<Scope>("spotify");
+  const [libraryFilter, setLibraryFilter] = useState("");
+  const [listFilter, setListFilter] = useState("");
   const [searchType, setSearchType] = useState<SearchType>("all");
   const [results, setResults] = useState(EMPTY_RESULTS);
   const [searched, setSearched] = useState(false);
@@ -227,31 +230,33 @@ export default function LibraryBrowser({
   );
   const trackList = usePagedList(source.uri, fetchTracks);
 
-  const filter = query.trim();
-  const libraryMode = scope === "library" && filter !== "";
-  const listFiltered = scope === "list" && filter !== "";
+  // the list box only makes sense over a list of songs we hold — search has its
+  // own box and the queue is whatever is playing
+  const canFilterList = !searching && !isQueue;
+  const listFiltered = canFilterList && listFilter.trim() !== "";
 
   const sourceTracks = searching
     ? results.tracks.items
     : isQueue
       ? (queue?.tracks ?? [])
       : trackList.items;
-  const trackRows = libraryMode
-    ? []
-    : listFiltered
-      ? sourceTracks.filter((t) => matchesFilter(filter, t.name, t.artists))
-      : sourceTracks;
-  // playlist/album rows sit above the track rows in one selection index space:
-  // My Library shows only these, a Spotify search shows its album hits here and
-  // its track hits below, every other source shows none.
-  const browseRows: LibraryRow[] = libraryMode
-    ? [
-        ...playlists.items.map((p) => ({ ...p, kind: "Playlist" as const })),
-        ...albums.items.map((a) => ({ ...a, kind: "Album" as const })),
-      ].filter((r) => matchesFilter(filter, r.name))
-    : searching
-      ? results.albums.items.map((a) => ({ ...a, kind: "Album" as const }))
-      : [];
+  const trackRows = listFiltered
+    ? sourceTracks.filter((t) => matchesFilter(listFilter, t.name, t.artists))
+    : sourceTracks;
+  // album rows sit above the track rows in one selection index space: a Spotify
+  // search shows its album hits here and its track hits below, every other
+  // source shows none.
+  const browseRows: LibraryRow[] = searching
+    ? results.albums.items.map((a) => ({ ...a, kind: "Album" as const }))
+    : [];
+  // ponytail: filters the pages already loaded, not the whole library — scroll
+  // the pane to pull more. Upgrade path: force-load every page on first keypress.
+  const shownPlaylists = playlists.items.filter((p) =>
+    matchesFilter(libraryFilter, p.name)
+  );
+  const shownAlbums = albums.items.filter((a) =>
+    matchesFilter(libraryFilter, a.name)
+  );
   const rowNames = [
     ...browseRows.map((r) => r.name),
     ...trackRows.map((t) => t.name),
@@ -260,13 +265,12 @@ export default function LibraryBrowser({
   // holds songs; a list of albums alone counts tracks there instead, and an
   // album sitting among songs leaves it blank (Explorer does this for folders)
   const sizeHeader = trackRows.length > 0 ? "Time" : "Tracks";
-  const loading = !libraryMode && !searching && !isQueue && trackList.loading;
+  const loading = !searching && !isQueue && trackList.loading;
   const queueIndex = queue
     ? queuePosition(queue.tracks, nowPlayingUri, queue.startIndex)
     : -1;
 
   useEffect(() => {
-    if (scope !== "spotify") return;
     const q = query.trim();
     let cancelled = false;
     const id = setTimeout(async () => {
@@ -282,7 +286,7 @@ export default function LibraryBrowser({
       cancelled = true;
       clearTimeout(id);
     };
-  }, [query, scope, searchType]);
+  }, [query, searchType]);
 
   useEffect(() => {
     // the request object changing is the only trigger — selectSource is re-made
@@ -314,6 +318,7 @@ export default function LibraryBrowser({
     setSource({ uri, name });
     setSelected(-1);
     setNotice("");
+    setListFilter("");
     // search results and the queue are gone after a reload, so restoring them
     // would land on an empty pane — only real sources are worth remembering
     if (uri !== SEARCH_URI && uri !== QUEUE_URI)
@@ -395,12 +400,7 @@ export default function LibraryBrowser({
 
   function onListScroll(e: React.UIEvent<HTMLDivElement>) {
     if (!nearBottom(e.currentTarget)) return;
-    if (libraryMode) {
-      playlists.loadMore();
-      albums.loadMore();
-    } else if (!searching) {
-      trackList.loadMore();
-    }
+    if (!searching) trackList.loadMore();
   }
 
   function openMenu(e: React.MouseEvent, index: number) {
@@ -441,12 +441,10 @@ export default function LibraryBrowser({
   function searchArtist(track: TrackResult) {
     const q = firstArtist(track.artists);
     setMenu(null);
-    setScope("spotify");
     setSelected(-1);
     // the debounced search effect picks the query up and selects Search
     // Results — unless nothing changed, in which case it never re-runs
-    if (q && q === query && scope === "spotify")
-      selectSource(SEARCH_URI, "Search Results");
+    if (q && q === query) selectSource(SEARCH_URI, "Search Results");
     setQuery(q);
   }
 
@@ -527,7 +525,6 @@ export default function LibraryBrowser({
     ...albums.items,
     ...results.albums.items,
   ].find((p) => p.uri === source.uri)?.image;
-  const headerName = libraryMode ? "My Library" : source.name;
   // any list failing is the same story for the status bar: what you're looking
   // at is empty because Spotify refused, not because there's nothing there
   const failure =
@@ -542,7 +539,7 @@ export default function LibraryBrowser({
     ? queue
       ? `Track ${queueIndex + 1} of ${queue.tracks.length} — ${queue.name}`
       : "Nothing playing"
-    : libraryMode || listFiltered || searching
+    : listFiltered || searching
       ? `${rowNames.length} items`
       : itemsLabel(sourceTracks.length, trackList.total);
 
@@ -551,7 +548,7 @@ export default function LibraryBrowser({
       <div className="win-titlebar">My Music</div>
 
       <div className="p-2 flex items-center gap-2">
-        <label htmlFor="library-search">Search:</label>
+        <label htmlFor="library-search">Search Spotify:</label>
         <input
           id="library-search"
           value={query}
@@ -561,38 +558,20 @@ export default function LibraryBrowser({
           }}
           className="w-64 px-2 py-0.5"
         />
-        <label htmlFor="library-scope">in</label>
+        <label htmlFor="library-search-type">for</label>
         <select
-          id="library-scope"
-          value={scope}
+          id="library-search-type"
+          value={searchType}
           onChange={(e) => {
-            setScope(e.target.value as Scope);
+            setSearchType(e.target.value as SearchType);
             setSelected(-1);
           }}
           className="px-1 py-0.5"
         >
-          <option value="spotify">Spotify</option>
-          <option value="list">This list</option>
-          <option value="library">My Library</option>
+          <option value="all">Songs &amp; Albums</option>
+          <option value="track">Songs</option>
+          <option value="album">Albums</option>
         </select>
-        {scope === "spotify" && (
-          <>
-            <label htmlFor="library-search-type">for</label>
-            <select
-              id="library-search-type"
-              value={searchType}
-              onChange={(e) => {
-                setSearchType(e.target.value as SearchType);
-                setSelected(-1);
-              }}
-              className="px-1 py-0.5"
-            >
-              <option value="all">Songs &amp; Albums</option>
-              <option value="track">Songs</option>
-              <option value="album">Albums</option>
-            </select>
-          </>
-        )}
         <button onClick={() => play(0)} className="ml-auto px-3 py-1">
           ▶ Play all
         </button>
@@ -602,29 +581,38 @@ export default function LibraryBrowser({
         {/* the pane fills whatever height the track side ends up with (the list
             is resizable) — absolute so its own content can't set that height */}
         <div className="relative w-[190px] shrink-0">
+          <div className="absolute inset-0 flex flex-col gap-1">
+          <input
+            aria-label="Filter library"
+            placeholder="Filter library…"
+            value={libraryFilter}
+            onChange={(e) => setLibraryFilter(e.target.value)}
+            className="px-2 py-0.5 w-full"
+          />
           <div
             onScroll={onSourceScroll}
-            className="win-inset absolute inset-0 overflow-y-auto py-0.5"
+            className="win-inset flex-1 min-h-0 overflow-y-auto py-0.5"
           >
           {sourceRow(QUEUE_URI, "Now Playing", "▶ Now Playing")}
           {sourceRow(LIKED_URI, "Liked Songs", "♥ Liked Songs", undefined, true)}
           {searched && sourceRow(SEARCH_URI, "Search Results", "🔍 Search Results")}
           <hr className="my-1 border-gray-600" />
-          {playlists.items.map((p) =>
+          {shownPlaylists.map((p) =>
             sourceRow(p.uri, p.name, `♪ ${p.name}`, p.trackCount, true)
           )}
           <hr className="my-1 border-gray-600" />
           <div className="px-2 py-0.5 font-bold text-gray-500">Saved Albums</div>
-          {albums.items.map((a) =>
+          {shownAlbums.map((a) =>
             sourceRow(a.uri, a.name, `💿 ${a.name}`, a.trackCount)
           )}
+          </div>
           </div>
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 px-2 py-1">
             <div className="win-inset w-12 h-12 shrink-0">
-              {!libraryMode && sourceImage && coverBrokenFor !== source.uri ? (
+              {sourceImage && coverBrokenFor !== source.uri ? (
                 // ponytail: plain <img>, not next/image — avoids a
                 // remotePatterns entry for i.scdn.co in next.config.ts
                 // eslint-disable-next-line @next/next/no-img-element
@@ -639,11 +627,23 @@ export default function LibraryBrowser({
               )}
             </div>
             <div className="min-w-0">
-              <div className="truncate font-bold">{headerName}</div>
+              <div className="truncate font-bold">{source.name}</div>
               <div className="text-gray-500">
                 {rowNames.length} {browseRows.length ? "items" : "tracks"}
               </div>
             </div>
+            {canFilterList && (
+              <input
+                aria-label="Filter list"
+                placeholder="Filter this list…"
+                value={listFilter}
+                onChange={(e) => {
+                  setListFilter(e.target.value);
+                  setSelected(-1);
+                }}
+                className="ml-auto w-48 px-2 py-0.5"
+              />
+            )}
           </div>
           <div className={`grid ${COLS}`}>
             {[...HEADERS.slice(0, -1), sizeHeader].map((h) => (
@@ -665,7 +665,7 @@ export default function LibraryBrowser({
               <div className="px-2 py-0.5">Loading…</div>
             ) : rowNames.length === 0 ? (
               <div className="px-2 py-0.5">
-                {searching || filter ? "(no results)" : "(empty)"}
+                {searching || listFiltered ? "(no results)" : "(empty)"}
               </div>
             ) : (
               <>

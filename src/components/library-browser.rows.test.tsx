@@ -102,7 +102,7 @@ const cellsOf = (row: number) =>
 
 async function searchFor(query: string) {
   render(<LibraryBrowser onPlay={vi.fn()} />);
-  fireEvent.change(screen.getByLabelText("Search:"), {
+  fireEvent.change(screen.getByLabelText("Search Spotify:"), {
     target: { value: query },
   });
   await waitFor(() => expect(searchMock).toHaveBeenCalled(), { timeout: 2000 });
@@ -247,24 +247,44 @@ describe("LibraryBrowser search rows", () => {
     await waitFor(() => expect(getAlbumTracksMock).toHaveBeenCalledTimes(2));
   });
 
-  it("shows saved playlists and albums with their type in My Library", async () => {
+  // each box owns one scope, decided by where it sits
+  it("filters only the sources pane from the box above it", async () => {
     getMyPlaylistsMock.mockResolvedValueOnce({ items: [PLAYLIST], total: 1 });
     getSavedAlbumsMock.mockResolvedValueOnce({ items: [SAVED_ALBUM], total: 1 });
     render(<LibraryBrowser onPlay={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("in"), { target: { value: "library" } });
-    fireEvent.change(screen.getByLabelText("Search:"), { target: { value: "a" } });
+    await screen.findByText(`💿 ${SAVED_ALBUM.name}`);
 
-    await screen.findByText(SAVED_ALBUM.name);
-    expect(cellsOf(0)).toEqual(["♪", "Playlist", PLAYLIST.name, "", "", "7"]);
-    expect(cellsOf(1)).toEqual([
-      "💿",
-      "Album",
-      SAVED_ALBUM.name,
-      SAVED_ALBUM.artists,
-      "",
-      "12",
-    ]);
-    // the type filter belongs to a Spotify search only
-    expect(screen.queryByLabelText("for")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Filter library"), {
+      target: { value: "saved" },
+    });
+    expect(screen.queryByText(`♪ ${PLAYLIST.name}`)).toBeNull();
+    expect(screen.getByText(`💿 ${SAVED_ALBUM.name}`)).toBeInTheDocument();
+    // the pinned sources stay put, and no library hit leaks into the track list
+    expect(screen.getByText("♥ Liked Songs")).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-row]")).toHaveLength(0);
+    expect(searchMock).not.toHaveBeenCalled();
+  });
+
+  it("filters only the open list from the box above it", async () => {
+    getLikedTracksMock.mockResolvedValueOnce({
+      items: [TRACK, TRACK_NO_ALBUM],
+      total: 2,
+    });
+    render(<LibraryBrowser onPlay={vi.fn()} />);
+    await screen.findByText(TRACK.name);
+
+    fireEvent.change(screen.getByLabelText("Filter list"), {
+      target: { value: "solo" },
+    });
+    const rows = document.querySelectorAll("[data-row]");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain(TRACK_NO_ALBUM.name);
+    expect(searchMock).not.toHaveBeenCalled();
+  });
+
+  // it filters what we hold, and search results are not ours to re-filter
+  it("hides the list filter for search results", async () => {
+    await searchFor("test");
+    expect(screen.queryByLabelText("Filter list")).toBeNull();
   });
 });
