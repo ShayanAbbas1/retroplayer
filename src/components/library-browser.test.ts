@@ -11,7 +11,7 @@ const pageAt = (offset: number): Page<{ uri: string }> => ({
   total: TOTAL,
 });
 
-const offsetsOf = (fetchPage: { mock: { calls: [number, string][] } }) =>
+const offsetsOf = (fetchPage: { mock: { calls: [number, ...unknown[]][] } }) =>
   fetchPage.mock.calls.map(([offset]) => offset);
 
 describe("usePagedList", () => {

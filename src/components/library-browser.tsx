@@ -10,11 +10,12 @@ import {
   getSavedAlbums,
   getToken,
   isTrackLiked,
-  searchTracks,
+  search,
   setTrackLiked,
   type ApiError,
   type Page,
   type PlaylistResult,
+  type SearchType,
   type TrackResult,
 } from "@/lib/spotify-client";
 import {
@@ -41,9 +42,12 @@ const SEARCH_URI = "search";
 const QUEUE_URI = "queue";
 // static labels: sorting was cut — the Web API has no sort parameter, so an
 // honest sort would mean force-loading every page of the source first
-const TRACK_HEADERS = ["#", "Title", "Artist", "Time"];
-const LIBRARY_HEADERS = ["#", "Name", "Kind", "Tracks"];
-const COLS = "grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,15rem)_4rem]";
+// One column order for every flavour of row, Explorer-style: the Type column is
+// what tells a song from an album when a search returns both, and the last
+// column is a duration only when there are songs in the list (see `sizeHeader`).
+const HEADERS = ["#", "Type", "Name", "Artist", "Album", "Time"];
+const COLS =
+  "grid-cols-[2.5rem_3.5rem_minmax(0,1fr)_minmax(0,8rem)_minmax(0,8rem)_3.5rem]";
 const PAGE_ROWS = 18; // list is 380px tall at 20px per row
 const TYPE_AHEAD_RESET_MS = 800;
 const SCROLL_SLACK = 60; // px from the bottom that pulls the next page
@@ -60,6 +64,10 @@ type Menu = { x: number; y: number } & (
 const isAlbumUri = (uri: string) => uri.startsWith("spotify:album:");
 
 const EMPTY_PAGE: Page<TrackResult> = { items: [], total: 0 };
+const EMPTY_RESULTS = {
+  tracks: EMPTY_PAGE,
+  albums: { items: [], total: 0 } as Page<PlaylistResult>,
+};
 
 // module-level so their identity is stable across renders
 const fetchPlaylists = (offset: number, token: string) =>
@@ -165,7 +173,8 @@ interface Props {
 export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("spotify");
-  const [results, setResults] = useState<Page<TrackResult>>(EMPTY_PAGE);
+  const [searchType, setSearchType] = useState<SearchType>("all");
+  const [results, setResults] = useState(EMPTY_RESULTS);
   const [searched, setSearched] = useState(false);
   // the last source picked, restored from localStorage; a uri that no longer
   // exists just fails to load like any other dead playlist would
@@ -203,10 +212,11 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
       if (source.uri === SEARCH_URI || source.uri === QUEUE_URI)
         return Promise.resolve(EMPTY_PAGE);
       if (source.uri === LIKED_URI) return getLikedTracks(token, offset);
-      if (isAlbumUri(source.uri)) return getAlbumTracks(source.uri, token, offset);
+      if (isAlbumUri(source.uri))
+        return getAlbumTracks(source.uri, token, offset, source.name);
       return getPlaylistTracks(source.uri, token, offset);
     },
-    [source.uri]
+    [source.uri, source.name]
   );
   const trackList = usePagedList(source.uri, fetchTracks);
 
@@ -215,22 +225,34 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
   const listFiltered = scope === "list" && filter !== "";
 
   const sourceTracks = searching
-    ? results.items
+    ? results.tracks.items
     : isQueue
       ? (queue?.tracks ?? [])
       : trackList.items;
-  const trackRows = listFiltered
-    ? sourceTracks.filter((t) => matchesFilter(filter, t.name, t.artists))
-    : sourceTracks;
-  const libraryRows: LibraryRow[] = libraryMode
+  const trackRows = libraryMode
+    ? []
+    : listFiltered
+      ? sourceTracks.filter((t) => matchesFilter(filter, t.name, t.artists))
+      : sourceTracks;
+  // playlist/album rows sit above the track rows in one selection index space:
+  // My Library shows only these, a Spotify search shows its album hits here and
+  // its track hits below, every other source shows none.
+  const browseRows: LibraryRow[] = libraryMode
     ? [
         ...playlists.items.map((p) => ({ ...p, kind: "Playlist" as const })),
         ...albums.items.map((a) => ({ ...a, kind: "Album" as const })),
       ].filter((r) => matchesFilter(filter, r.name))
-    : [];
-  const rowNames = libraryMode
-    ? libraryRows.map((r) => r.name)
-    : trackRows.map((t) => t.name);
+    : searching
+      ? results.albums.items.map((a) => ({ ...a, kind: "Album" as const }))
+      : [];
+  const rowNames = [
+    ...browseRows.map((r) => r.name),
+    ...trackRows.map((t) => t.name),
+  ];
+  // the last column is a song duration, so it only says "Time" when the list
+  // holds songs; a list of albums alone counts tracks there instead, and an
+  // album sitting among songs leaves it blank (Explorer does this for folders)
+  const sizeHeader = trackRows.length > 0 ? "Time" : "Tracks";
   const loading = !libraryMode && !searching && !isQueue && trackList.loading;
   const queueIndex = queue
     ? queuePosition(queue.tracks, nowPlayingUri, queue.startIndex)
@@ -241,7 +263,7 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
     const q = query.trim();
     let cancelled = false;
     const id = setTimeout(async () => {
-      const r = q ? await searchTracks(q, await getToken()) : EMPTY_PAGE;
+      const r = q ? await search(q, await getToken(), searchType) : EMPTY_RESULTS;
       if (cancelled) return;
       setResults(r);
       if (q) {
@@ -253,7 +275,7 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
       cancelled = true;
       clearTimeout(id);
     };
-  }, [query, scope]);
+  }, [query, scope, searchType]);
 
   useEffect(() => {
     listRef.current
@@ -311,13 +333,14 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
     onPlay(source.uri, position);
   }
 
+  // `index` counts rows as rendered: the browse rows first, tracks after
   function activate(index: number) {
-    if (!libraryMode) {
-      play(index);
+    const row = browseRows[index];
+    if (row) {
+      selectSource(row.uri, row.name);
       return;
     }
-    const row = libraryRows[index];
-    if (row) selectSource(row.uri, row.name);
+    play(index - browseRows.length);
   }
 
   function handleKey(e: React.KeyboardEvent) {
@@ -369,7 +392,7 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
 
   function openMenu(e: React.MouseEvent, index: number) {
     e.preventDefault();
-    setSelected(index);
+    setSelected(browseRows.length + index);
     setSubmenu(false);
     setMenuLiked(null);
     const track = trackRows[index];
@@ -394,6 +417,12 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
     setMenu(null);
     const ok = await addToPlaylist(playlistUri, track.uri, await getToken());
     setNotice(ok ? `Added "${track.name}".` : "Could not add.");
+  }
+
+  function goToAlbum(track: TrackResult) {
+    setMenu(null);
+    if (!track.albumUri) return;
+    selectSource(track.albumUri, track.album || "Album");
   }
 
   function searchArtist(track: TrackResult) {
@@ -477,17 +506,19 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
     );
   };
 
-  const totalMs = libraryMode
-    ? 0
-    : trackRows.reduce((sum, t) => sum + t.durationMs, 0);
-  const sourceImage = [...playlists.items, ...albums.items].find(
-    (p) => p.uri === source.uri
-  )?.image;
+  const totalMs = trackRows.reduce((sum, t) => sum + t.durationMs, 0);
+  // search album hits are in the pool too, so an album opened from a search
+  // still shows its cover
+  const sourceImage = [
+    ...playlists.items,
+    ...albums.items,
+    ...results.albums.items,
+  ].find((p) => p.uri === source.uri)?.image;
   const headerName = libraryMode ? "My Library" : source.name;
   // any list failing is the same story for the status bar: what you're looking
   // at is empty because Spotify refused, not because there's nothing there
   const failure =
-    trackList.error ?? playlists.error ?? albums.error ?? results.error;
+    trackList.error ?? playlists.error ?? albums.error ?? results.tracks.error;
   const failureText =
     failure === "auth"
       ? "Session expired — sign in again to load your library."
@@ -531,16 +562,37 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
           <option value="list">This list</option>
           <option value="library">My Library</option>
         </select>
+        {scope === "spotify" && (
+          <>
+            <label htmlFor="library-search-type">for</label>
+            <select
+              id="library-search-type"
+              value={searchType}
+              onChange={(e) => {
+                setSearchType(e.target.value as SearchType);
+                setSelected(-1);
+              }}
+              className="px-1 py-0.5"
+            >
+              <option value="all">Songs &amp; Albums</option>
+              <option value="track">Songs</option>
+              <option value="album">Albums</option>
+            </select>
+          </>
+        )}
         <button onClick={() => play(0)} className="ml-auto px-3 py-1">
           ▶ Play all
         </button>
       </div>
 
       <div className="px-2 flex gap-1">
-        <div
-          onScroll={onSourceScroll}
-          className="win-inset w-[190px] shrink-0 h-[404px] overflow-y-auto py-0.5"
-        >
+        {/* the pane fills whatever height the track side ends up with (the list
+            is resizable) — absolute so its own content can't set that height */}
+        <div className="relative w-[190px] shrink-0">
+          <div
+            onScroll={onSourceScroll}
+            className="win-inset absolute inset-0 overflow-y-auto py-0.5"
+          >
           {sourceRow(QUEUE_URI, "Now Playing", "▶ Now Playing")}
           {sourceRow(LIKED_URI, "Liked Songs", "♥ Liked Songs", undefined, true)}
           {searched && sourceRow(SEARCH_URI, "Search Results", "🔍 Search Results")}
@@ -553,6 +605,7 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
           {albums.items.map((a) =>
             sourceRow(a.uri, a.name, `💿 ${a.name}`, a.trackCount)
           )}
+          </div>
         </div>
 
         <div className="flex-1 min-w-0">
@@ -575,12 +628,12 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
             <div className="min-w-0">
               <div className="truncate font-bold">{headerName}</div>
               <div className="text-gray-500">
-                {rowNames.length} {libraryMode ? "items" : "tracks"}
+                {rowNames.length} {browseRows.length ? "items" : "tracks"}
               </div>
             </div>
           </div>
           <div className={`grid ${COLS}`}>
-            {(libraryMode ? LIBRARY_HEADERS : TRACK_HEADERS).map((h) => (
+            {[...HEADERS.slice(0, -1), sizeHeader].map((h) => (
               <button key={h} tabIndex={-1} className="px-2 py-0.5 text-left truncate">
                 {h}
               </button>
@@ -601,47 +654,57 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
               <div className="px-2 py-0.5">
                 {searching || filter ? "(no results)" : "(empty)"}
               </div>
-            ) : libraryMode ? (
-              libraryRows.map((r, i) => (
-                <div
-                  key={r.uri}
-                  data-row={i}
-                  onClick={() => setSelected(i)}
-                  onDoubleClick={() => activate(i)}
-                  className={`grid ${COLS} h-5 leading-5 ${
-                    i === selected ? "win-selected" : ""
-                  }`}
-                >
-                  <span className="px-2">{r.kind === "Album" ? "💿" : "♪"}</span>
-                  <span className="px-2 truncate">{r.name}</span>
-                  <span className="px-2 truncate">{r.kind}</span>
-                  <span className="px-2 text-right">{r.trackCount}</span>
-                </div>
-              ))
             ) : (
-              trackRows.map((t, i) => {
-                const isNowPlaying = t.uri === nowPlayingUri;
-                return (
+              <>
+                {browseRows.map((r, i) => (
                   <div
-                    key={`${t.uri}-${i}`}
+                    key={r.uri}
                     data-row={i}
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData("text/plain", t.uri)}
-                    onDragEnd={() => setDragOver(null)}
                     onClick={() => setSelected(i)}
-                    onDoubleClick={() => play(i)}
-                    onContextMenu={(e) => openMenu(e, i)}
+                    onDoubleClick={() => activate(i)}
                     className={`grid ${COLS} h-5 leading-5 ${
                       i === selected ? "win-selected" : ""
-                    } ${isNowPlaying ? "font-bold" : ""}`}
+                    }`}
                   >
-                    <span className="px-2">{isNowPlaying ? "▶" : i + 1}</span>
-                    <span className="px-2 truncate">{t.name}</span>
-                    <span className="px-2 truncate">{t.artists}</span>
-                    <span className="px-2 text-right">{formatDuration(t.durationMs)}</span>
+                    <span className="px-2">{r.kind === "Album" ? "💿" : "♪"}</span>
+                    <span className="px-2 truncate">{r.kind}</span>
+                    <span className="px-2 truncate">{r.name}</span>
+                    <span className="px-2 truncate">{r.artists ?? ""}</span>
+                    <span className="px-2 truncate" />
+                    {/* a count here would sit under "Time" once songs share the
+                        list, so it only shows when the list is albums alone */}
+                    <span className="px-2 text-right">
+                      {trackRows.length > 0 ? "" : r.trackCount}
+                    </span>
                   </div>
-                );
-              })
+                ))}
+                {trackRows.map((t, i) => {
+                  const isNowPlaying = t.uri === nowPlayingUri;
+                  const row = browseRows.length + i;
+                  return (
+                    <div
+                      key={`${t.uri}-${i}`}
+                      data-row={row}
+                      draggable
+                      onDragStart={(e) => e.dataTransfer.setData("text/plain", t.uri)}
+                      onDragEnd={() => setDragOver(null)}
+                      onClick={() => setSelected(row)}
+                      onDoubleClick={() => play(i)}
+                      onContextMenu={(e) => openMenu(e, i)}
+                      className={`grid ${COLS} h-5 leading-5 ${
+                        row === selected ? "win-selected" : ""
+                      } ${isNowPlaying ? "font-bold" : ""}`}
+                    >
+                      <span className="px-2">{isNowPlaying ? "▶" : i + 1}</span>
+                      <span className="px-2 truncate">Song</span>
+                      <span className="px-2 truncate">{t.name}</span>
+                      <span className="px-2 truncate">{t.artists}</span>
+                      <span className="px-2 truncate">{t.album}</span>
+                      <span className="px-2 text-right">{formatDuration(t.durationMs)}</span>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         </div>
@@ -680,7 +743,7 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
           ) : (
             <>
               <button
-                onClick={() => play(selected)}
+                onClick={() => activate(selected)}
                 className="win-listrow w-full text-left px-4 py-0.5"
               >
                 Play
@@ -688,6 +751,13 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
               {/* ponytail: no "Add to Queue" — POST me/player/queue needs the
                   device_id, which only use-spotify-player holds. Add it by
                   surfacing deviceId here if anyone asks. */}
+              <button
+                onClick={() => goToAlbum(menu.track)}
+                disabled={!menu.track.albumUri}
+                className="win-listrow w-full text-left px-4 py-0.5"
+              >
+                💿 Go to Album
+              </button>
               <button
                 onClick={() => searchArtist(menu.track)}
                 className="win-listrow w-full text-left px-4 py-0.5"
