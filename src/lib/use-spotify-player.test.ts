@@ -1,5 +1,56 @@
 import { describe, it, expect } from "vitest";
-import { interpolatePosition, buildPlayBody } from "./use-spotify-player";
+import {
+  buildPlayBody,
+  interpolatePosition,
+  mapPlayerTrack,
+} from "./use-spotify-player";
+
+describe("mapPlayerTrack", () => {
+  it("maps the SDK's track, album uri included", () => {
+    expect(
+      mapPlayerTrack({
+        name: "Feel Good Inc.",
+        uri: "spotify:track:1",
+        artists: [{ name: "Gorillaz" }, { name: "De La Soul" }],
+        album: {
+          uri: "spotify:album:5",
+          name: "Demon Days",
+          images: [
+            { url: "big", width: 640 },
+            { url: "small", width: 64 },
+          ],
+        },
+      })
+    ).toEqual({
+      name: "Feel Good Inc.",
+      artists: "Gorillaz, De La Soul",
+      albumName: "Demon Days",
+      albumUri: "spotify:album:5",
+      albumArtUrl: "small",
+      uri: "spotify:track:1",
+    });
+  });
+
+  // a podcast episode arrives without an album uri — the Now Playing bar keys
+  // its "Go to Album" button off this being empty rather than crashing
+  it("survives a track with no album uri or images", () => {
+    expect(
+      mapPlayerTrack({
+        name: "Episode 12",
+        uri: "spotify:episode:9",
+        artists: [],
+        album: { name: "", images: [] },
+      })
+    ).toEqual({
+      name: "Episode 12",
+      artists: "",
+      albumName: "",
+      albumUri: "",
+      albumArtUrl: "",
+      uri: "spotify:episode:9",
+    });
+  });
+});
 
 describe("interpolatePosition", () => {
   const base = { positionMs: 10_000, durationMs: 200_000, updatedAt: 1_000 };

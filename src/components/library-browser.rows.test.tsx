@@ -227,6 +227,26 @@ describe("LibraryBrowser search rows", () => {
     expect(cellsOf(0)[5]).toBe("10");
   });
 
+  // how the Now Playing bar's "Go to Album" reaches the browser
+  it("opens the album handed to it through the openAlbum prop", async () => {
+    const album = { uri: "spotify:album:asked", name: "Asked For" };
+    const { rerender } = render(<LibraryBrowser onPlay={vi.fn()} openAlbum={null} />);
+    expect(getAlbumTracksMock).not.toHaveBeenCalled();
+
+    rerender(<LibraryBrowser onPlay={vi.fn()} openAlbum={album} />);
+    await waitFor(() =>
+      expect(getAlbumTracksMock).toHaveBeenCalledWith(album.uri, "token", 0, album.name)
+    );
+    expect(await screen.findByText(album.name)).toBeInTheDocument();
+
+    // walk away, then ask for the same album again: a fresh object per click is
+    // what makes the repeat land (a uri prop would compare equal and be ignored)
+    fireEvent.click(screen.getByText("♥ Liked Songs"));
+    await waitFor(() => expect(getLikedTracksMock).toHaveBeenCalled());
+    rerender(<LibraryBrowser onPlay={vi.fn()} openAlbum={{ ...album }} />);
+    await waitFor(() => expect(getAlbumTracksMock).toHaveBeenCalledTimes(2));
+  });
+
   it("shows saved playlists and albums with their type in My Library", async () => {
     getMyPlaylistsMock.mockResolvedValueOnce({ items: [PLAYLIST], total: 1 });
     getSavedAlbumsMock.mockResolvedValueOnce({ items: [SAVED_ALBUM], total: 1 });

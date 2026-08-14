@@ -15,6 +15,12 @@ export default function RetroPlayer() {
   // uri of the track whose album art failed to load, so a broken image
   // shows the flat placeholder instead of a broken-image icon
   const [artBrokenFor, setArtBrokenFor] = useState<string | null>(null);
+  // the album the library browser has been asked to open; a new object each
+  // click, which is what makes a repeat request land
+  const [openAlbum, setOpenAlbum] = useState<{
+    uri: string;
+    name: string;
+  } | null>(null);
 
   const { status, track, paused, positionMs, durationMs, volume, controls } =
     useSpotifyPlayer();
@@ -136,6 +142,15 @@ export default function RetroPlayer() {
             <span className="flex-1 min-w-0 truncate">
               {track.name} — {track.artists}
             </span>
+            <button
+              onClick={() =>
+                setOpenAlbum({ uri: track.albumUri, name: track.albumName })
+              }
+              disabled={!track.albumUri}
+              className="px-3 py-1"
+            >
+              💿 Go to Album
+            </button>
             <button onClick={toggleLike} className="px-3 py-1">
               {liked ? "♥ Liked" : "♡ Like"}
             </button>
@@ -143,7 +158,11 @@ export default function RetroPlayer() {
         </div>
       )}
 
-      <LibraryBrowser onPlay={controls.play} nowPlayingUri={track?.uri} />
+      <LibraryBrowser
+        onPlay={controls.play}
+        nowPlayingUri={track?.uri}
+        openAlbum={openAlbum}
+      />
     </div>
   );
 }

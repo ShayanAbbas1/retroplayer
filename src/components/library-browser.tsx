@@ -168,9 +168,16 @@ export function usePagedList<T>(
 interface Props {
   onPlay: (arg: PlayArg, offsetPosition?: number) => void;
   nowPlayingUri?: string;
+  // an album the Now Playing bar asked us to open; a fresh object per request,
+  // so asking twice for the same album still lands
+  openAlbum?: Source | null;
 }
 
-export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
+export default function LibraryBrowser({
+  onPlay,
+  nowPlayingUri,
+  openAlbum,
+}: Props) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("spotify");
   const [searchType, setSearchType] = useState<SearchType>("all");
@@ -276,6 +283,12 @@ export default function LibraryBrowser({ onPlay, nowPlayingUri }: Props) {
       clearTimeout(id);
     };
   }, [query, scope, searchType]);
+
+  useEffect(() => {
+    // the request object changing is the only trigger — selectSource is re-made
+    // every render, so depending on it would re-open the album forever
+    if (openAlbum) selectSource(openAlbum.uri, openAlbum.name);
+  }, [openAlbum]);
 
   useEffect(() => {
     listRef.current

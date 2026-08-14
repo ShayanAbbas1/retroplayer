@@ -17,6 +17,7 @@ export interface PlayerTrack {
   name: string;
   artists: string;
   albumName: string;
+  albumUri: string;
   albumArtUrl: string;
   uri: string;
 }
@@ -98,17 +99,31 @@ interface SpotifyNamespace {
   }) => SpotifyPlayer;
 }
 
+interface WebPlaybackTrack {
+  name: string;
+  uri: string;
+  artists: { name: string }[];
+  album: { uri?: string; name: string; images: SpotifyImage[] };
+}
+
 interface WebPlaybackState {
   paused: boolean;
   position: number;
   duration: number;
-  track_window: {
-    current_track: {
-      name: string;
-      uri: string;
-      artists: { name: string }[];
-      album: { name: string; images: SpotifyImage[] };
-    };
+  track_window: { current_track: WebPlaybackTrack };
+}
+
+// The SDK's own track shape, not the Web API's — pulled out of the listener so
+// the mapping is testable without a fake SDK. `album.uri` is what makes the
+// playing song's album reachable; podcasts arrive without one.
+export function mapPlayerTrack(t: WebPlaybackTrack): PlayerTrack {
+  return {
+    name: t.name,
+    artists: (t.artists ?? []).map((a) => a.name).join(", "),
+    albumName: t.album?.name ?? "",
+    albumUri: t.album?.uri ?? "",
+    albumArtUrl: pickImage(t.album?.images, 64) ?? "",
+    uri: t.uri,
   };
 }
 
@@ -154,14 +169,7 @@ export function useSpotifyPlayer(): SpotifyPlayerState {
       player.addListener("player_state_changed", (arg) => {
         const state = arg as WebPlaybackState | null;
         if (!state) return;
-        const t = state.track_window.current_track;
-        setTrack({
-          name: t.name,
-          artists: t.artists.map((a) => a.name).join(", "),
-          albumName: t.album.name,
-          albumArtUrl: pickImage(t.album.images, 64) ?? "",
-          uri: t.uri,
-        });
+        setTrack(mapPlayerTrack(state.track_window.current_track));
         setPaused(state.paused);
         setDurationMs(state.duration);
         setPositionMs(state.position);
